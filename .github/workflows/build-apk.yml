@@ -48,7 +48,7 @@ jobs:
         cordova build android --debug
 
     - name: Upload APK
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: smartgo-bus-debug
         path: smartgo-app/platforms/android/app/build/outputs/apk/debug/app-debug.apk
