@@ -26,6 +26,9 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
     - name: Install Cordova
       run: |
         npm install -g cordova@latest
@@ -34,18 +37,18 @@ jobs:
     - name: Create Cordova project
       run: |
         cordova create smartgo-app com.smartgo.bus "SmartGo智能公交"
-        cd smartgo-app
-        cordova platform add android
 
     - name: Copy project files
       run: |
         cp phonegap-build/config.xml smartgo-app/config.xml
         cp -r phonegap-build/www/* smartgo-app/www/
 
-    - name: Build APK
+    - name: Add Android platform and build
       run: |
         cd smartgo-app
-        cordova build android --debug
+        cordova platform add android --save
+        cordova requirements
+        cordova build android --debug --verbose
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
