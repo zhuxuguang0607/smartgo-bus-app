@@ -1,0 +1,25 @@
+# Node modules
+node_modules/
+
+# Cordova build output
+cordova-app/
+platforms/
+plugins/
+
+# Build outputs
+*.apk
+*.aab
+*.ipa
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*

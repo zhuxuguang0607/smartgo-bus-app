@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: https: http: gap: 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src *; img-src 'self' data: content: https: http:;">
+    <title>SmartGo智能公交</title>
+    <link rel="stylesheet" href="style.css">
+    <script type="text/javascript" src="cordova.js"></script>
+</head>
+<body>
+    <!-- AI配置和服务 -->
+    <script src="config.js"></script>
+    <script src="ai-service.js"></script>
+
+    <!-- ==================== 首页模块 ==================== -->
+    <div id="homeModule" class="main-module active">
+        <!-- 顶部栏：天气+城市+通知 -->
+        <div class="home-top-bar">
+            <div class="weather-info" id="weatherInfo">23°C多云</div>
+            <button class="chat-back-button-top" id="chatBackBtn" onclick="backToHome()" style="display: none;">返回</button>
+            <div class="city-selector" id="citySelector">上海 <span style="font-size: 12px;">▼</span></div>
+            <div class="notification-icon" id="notificationIcon">🔔</div>
+        </div>
+
+        <!-- AI对话容器 -->
+        <div class="ai-chat-container">
+            <!-- AI欢迎区域 -->
+            <div class="ai-welcome" id="aiWelcome">
+                <div class="smartgo-logo">
+                    <span class="buddy-sparkle">✨</span>
+                    <span class="buddy-sparkle">⭐</span>
+                    <span class="buddy-sparkle">💫</span>
+                    <div class="logo-circle">
+                        <div class="smartgo-text">SmartGo AI</div>
+                        <div class="buddy-greeting">嗨~ 我是你的出行搭子</div>
+                        <div class="ai-subtitle">想去哪儿就跟我说，帮你找最快最省心的路线！</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快捷问题 -->
+            <div class="quick-questions" id="quickQuestions">
+                <div class="quick-question-item" onclick="askQuickQuestion('我要去张江地铁站')">
+                    <span class="quick-question-icon">🚇</span>
+                    <span>我要去张江地铁站</span>
+                </div>
+                <div class="quick-question-item" onclick="askQuickQuestion('附近有哪些公交站')">
+                    <span class="quick-question-icon">🚏</span>
+                    <span>附近有哪些公交站</span>
+                </div>
+                <div class="quick-question-item" onclick="askQuickQuestion('去人民广场怎么坐车')">
+                    <span class="quick-question-icon">🗺️</span>
+                    <span>去人民广场怎么坐车</span>
+                </div>
+                <div class="quick-question-item" onclick="askQuickQuestion('查询浦东14路实时到站')">
+                    <span class="quick-question-icon">⏱️</span>
+                    <span>查询浦东14路实时到站</span>
+                </div>
+            </div>
+
+            <!-- 对话消息区域 -->
+            <div class="chat-messages" id="chatMessages"></div>
+
+            <!-- AI输入区域 -->
+            <div class="ai-input-area">
+                <button class="voice-button" id="voiceBtn" onclick="toggleVoiceInput()">🎤</button>
+                <div class="input-wrapper">
+                    <textarea class="ai-input" id="aiInput" placeholder="说出你的出行需求..." rows="1"></textarea>
+                    <button class="send-button" id="sendBtn" onclick="sendMessage()" disabled>➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 实时公交模块 ==================== -->
+    <div id="busModule" class="main-module">
+        <!-- 顶部公交车实景图片 -->
+        <div class="bus-photo-header">
+            <img src="beijing.png" alt="公交车" class="bus-photo" onerror="this.style.display='none'">
+            <div class="header-overlay"></div>
+            <div class="status-bar">
+                <div class="time-display">
+                    <span id="currentTime">10:13</span>
+                    <span>📍</span>
+                </div>
+                <div class="status-icons">
+                    <span>📶</span>
+                    <span>📶</span>
+                    <span>🔋 87</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公交信息卡片 -->
+        <div class="bus-info-card">
+            <div class="bus-title-row">
+                <div class="bus-name-section">
+                    <span class="bus-name">浦东 14 路</span>
+                </div>
+                <button class="wifi-button-top" onclick="connectWiFi()">
+                    <img src="wifi.png" alt="WiFi" class="wifi-icon-img" onerror="this.style.display='none'">
+                    <span>连接WiFi</span>
+                </button>
+            </div>
+            <div class="route-info">
+                <div class="route-direction-line">
+                    <span class="route-start">张江地铁站</span>
+                    <span class="route-arrow">→</span>
+                    <span class="route-end">益江路盛夏路</span>
+                </div>
+                <div class="route-details">
+                    <span class="route-time">首 07:00 末 21:30</span>
+                    <span class="route-divider">丨</span>
+                    <span class="route-price">票价 2 元</span>
+                </div>
+            </div>
+
+            <!-- 领取成功页面 -->
+            <div id="claimPage" class="claim-page-overlay">
+                <div class="claim-page-header">
+                    <button class="claim-back-btn" onclick="closeClaimPage()">← </button>
+                    <div class="claim-page-title">领取优惠券</div>
+                </div>
+                <div class="claim-page-content">
+                    <div class="claim-success-header">
+                        <div class="claim-success-icon"></div>
+                        <div class="claim-success-title">领取成功</div>
+                    </div>
+
+                    <div class="claim-voucher-card">
+                        <div class="voucher-item">
+                            <img src="https://images.unsplash.com/photo-1554866585-cd94860890b7?w=200&h=200&fit=crop" alt="可口可乐" class="voucher-image">
+                            <div class="voucher-info">
+                                <div class="voucher-title">麦当劳张江店 - 可口可乐（小杯）</div>
+                                <div class="voucher-location">📍 520m | 到店消费可用</div>
+                            </div>
+                        </div>
+
+                        <div class="claim-qr-section">
+                            <div class="claim-qr-code">
+                                <img src="二维码.png" alt="二维码" style="width: 100%; height: 100%; object-fit: contain;">
+                            </div>
+                            <div class="claim-qr-id">ID: 12345678</div>
+                        </div>
+                    </div>
+
+                    <div class="claim-tips">请下载该图片，到店消费时展示</div>
+
+                    <button class="claim-download-btn" onclick="downloadVoucher()">
+                        立即下载图片
+                    </button>
+                </div>
+            </div>
+
+            <!-- 图片预览模态框 -->
+            <div id="imagePreviewModal" class="image-preview-modal" onclick="closeImagePreview()">
+                <button class="image-preview-close" onclick="closeImagePreview()">×</button>
+                <div class="image-preview-content" onclick="event.stopPropagation()">
+                    <img id="previewImage" class="image-preview-img" src="" alt="预览图片">
+                </div>
+            </div>
+
+            <!-- 下车提醒按钮 -->
+            <div class="reminder-button-container">
+                <button class="reminder-button" onclick="setTargetStation()" id="reminderButton">
+                    <span class="reminder-desc">为了避免你错过下车站</span>
+                    <span class="reminder-highlight">开启下车提醒</span>
+                </button>
+            </div>
+
+            <!-- 进度条 -->
+            <div class="progress-container" id="stationProgress">
+                <div class="progress-track" id="progressTrack">
+                    <div class="progress-fill" id="progressFill"></div>
+                    <!-- 站点将由JavaScript动态生成 -->
+                </div>
+                <div class="station-names" id="stationNames">
+                    <!-- 站点名称将由JavaScript动态生成 -->
+                </div>
+            </div>
+
+            <!-- 快捷入口模块 -->
+            <div class="quick-entry-section">
+                <div class="main-tabs">
+                    <button class="main-tab active" data-target="nearbyLife">周边生活</button>
+                    <button class="main-tab" data-target="emergencyService">应急服务</button>
+                    <button class="main-tab" data-target="transferInfo">换乘信息</button>
+                </div>
+            </div>
+
+            <!-- 周边生活模块 -->
+            <div class="content-section" id="nearbyLife">
+                <div class="life-tabs">
+                    <button class="life-tab active" onclick="switchLifeTab(0)">
+                        <span class="life-icon">⭐</span>
+                        <span class="life-label">推荐</span>
+                    </button>
+                    <button class="life-tab" onclick="switchLifeTab(1)">
+                        <span class="life-icon">🍜</span>
+                        <span class="life-label">美食</span>
+                    </button>
+                    <button class="life-tab" onclick="switchLifeTab(2)">
+                        <span class="life-icon">🎮</span>
+                        <span class="life-label">玩乐</span>
+                    </button>
+                    <button class="life-tab" onclick="switchLifeTab(3)">
+                        <span class="life-icon">🏛️</span>
+                        <span class="life-label">景点</span>
+                    </button>
+                </div>
+                <div class="life-content" id="lifeContent"></div>
+            </div>
+
+            <!-- 应急服务模块 -->
+            <div class="content-section" id="emergencyService">
+                <div class="emergency-tabs">
+                    <button class="emergency-tab active" onclick="switchEmergencyTab(0)">
+                        <span class="emergency-icon">🚻</span>
+                        <span class="emergency-label">厕所</span>
+                    </button>
+                    <button class="emergency-tab" onclick="switchEmergencyTab(1)">
+                        <span class="emergency-icon">🏪</span>
+                        <span class="emergency-label">便利店</span>
+                    </button>
+                    <button class="emergency-tab" onclick="switchEmergencyTab(2)">
+                        <span class="emergency-icon">💊</span>
+                        <span class="emergency-label">药店</span>
+                    </button>
+                    <button class="emergency-tab" onclick="switchEmergencyTab(3)">
+                        <span class="emergency-icon">🏦</span>
+                        <span class="emergency-label">银行</span>
+                    </button>
+                </div>
+                <div class="emergency-content" id="emergencyContent"></div>
+            </div>
+
+            <!-- 换乘信息模块 -->
+            <div class="content-section" id="transferInfo">
+                <div class="transfer-tabs">
+                    <button class="transfer-tab active" onclick="switchTransferTab(0)">
+                        <span class="transfer-icon">🚇</span>
+                        <span class="transfer-label">地铁换乘</span>
+                    </button>
+                    <button class="transfer-tab" onclick="switchTransferTab(1)">
+                        <span class="transfer-icon">🚌</span>
+                        <span class="transfer-label">公交换乘</span>
+                    </button>
+                    <button class="transfer-tab" onclick="switchTransferTab(2)">
+                        <span class="transfer-icon">🚴</span>
+                        <span class="transfer-label">共享单车</span>
+                    </button>
+                </div>
+                <div class="transfer-content" id="transferContent"></div>
+            </div>
+
+            <!-- 下车提醒站点选择弹框 -->
+            <div class="station-select-overlay" id="stationSelectOverlay" onclick="closeStationSelect()">
+                <div class="station-select-modal" onclick="event.stopPropagation()">
+                    <div class="station-select-header">
+                        <h3 class="station-select-title">选择下车站点</h3>
+                        <button class="station-select-close" onclick="closeStationSelect()">×</button>
+                    </div>
+                    <div class="station-select-content" id="stationSelectContent">
+                        <!-- 站点列表将由JavaScript动态生成 -->
+                    </div>
+                    <div class="station-select-footer">
+                        <button class="station-select-confirm" onclick="confirmStationSelect()">设置下车站点</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab导航 (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-navigation" style="display: none;">
+            <a href="#offers" class="tab-button active" onclick="switchTab(0); return false;">
+                <span class="tab-label">沿途优惠</span>
+            </a>
+            <a href="#restroom" class="tab-button" onclick="switchTab(1); return false;">
+                <span class="tab-label">厕所</span>
+            </a>
+            <a href="#store" class="tab-button" onclick="switchTab(2); return false;">
+                <span class="tab-label">便利店</span>
+            </a>
+            <a href="#lost-found" class="tab-button" onclick="switchTab(3); return false;">
+                <span class="tab-label">失物招领</span>
+            </a>
+            <a href="#food" class="tab-button" onclick="switchTab(4); return false;">
+                <span class="tab-label">美食</span>
+            </a>
+            <a href="#scenic" class="tab-button" onclick="switchTab(5); return false;">
+                <span class="tab-label">景点</span>
+            </a>
+        </div>
+
+        <!-- Tab 0: 沿途优惠 (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-content-area active" style="display: none;">
+            <div class="offer-card" onclick="viewOffer('可口可乐（小杯）')">
+                <img src="https://images.unsplash.com/photo-1554866585-cd94860890b7?w=200&h=200&fit=crop" class="offer-image" alt="可口可乐">
+                <div class="offer-content">
+                    <div class="offer-title">
+                        <span class="merchant-name">麦当劳张江店</span>
+                        <span class="product-name">可口可乐（小杯）</span>
+                    </div>
+                    <div class="offer-distance">📍 距离 520 米 到店消费可用</div>
+                </div>
+                <button class="claim-button" onclick="event.stopPropagation(); showClaimPage()">免费领</button>
+            </div>
+
+            <div class="offer-card" onclick="viewOffer('生椰拿铁')">
+                <img src="https://images.unsplash.com/photo-1461023058943-07fcbe16d735?w=200&h=200&fit=crop" class="offer-image" alt="生椰拿铁">
+                <div class="offer-content">
+                    <div class="offer-title">
+                        <span class="merchant-name">瑞幸咖啡张江店</span>
+                        <span class="product-name">生椰拿铁</span>
+                    </div>
+                    <div class="offer-distance">📍 距离 720 米 到店消费可用</div>
+                </div>
+                <button class="claim-button" onclick="event.stopPropagation(); showClaimPage()">免费领</button>
+            </div>
+
+            <div class="offer-card" onclick="viewOffer('豪华早餐套餐')">
+                <img src="https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=200&h=200&fit=crop" class="offer-image" alt="豪华早餐">
+                <div class="offer-content">
+                    <div class="offer-title">
+                        <span class="merchant-name">肯德基盛荣路店</span>
+                        <span class="product-name">豪华早餐套餐</span>
+                    </div>
+                    <div class="offer-distance">📍 距离 350 米 到店消费可用</div>
+                </div>
+                <button class="claim-button" onclick="event.stopPropagation(); showClaimPage()">免费领</button>
+            </div>
+        </div>
+
+        <!-- Tab 1: 厕所 (按距离排序，最近的在前) (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-content-area" style="display: none;">
+            <div class="restroom-card">
+                <img src="卫生间.jpeg" class="restroom-image" alt="公厕">
+                <div class="restroom-info">
+                    <div class="restroom-title">张江盛荣路公厕</div>
+                    <div class="restroom-distance">📍 距离 200 米</div>
+                    <div class="restroom-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">免费</span>
+                    </div>
+                </div>
+                <button class="restroom-nav-btn" onclick="navigate('张江盛荣路公厕')">导航</button>
+            </div>
+
+            <div class="restroom-card">
+                <img src="卫生间.jpeg" class="restroom-image" alt="公厕">
+                <div class="restroom-info">
+                    <div class="restroom-title">张江高科地铁站公厕</div>
+                    <div class="restroom-distance">📍 距离 300 米</div>
+                    <div class="restroom-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">免费</span>
+                        <span class="feature-tag-small">无障碍</span>
+                    </div>
+                </div>
+                <button class="restroom-nav-btn" onclick="navigate('张江高科地铁站公厕')">导航</button>
+            </div>
+
+            <div class="restroom-card">
+                <img src="卫生间.jpeg" class="restroom-image" alt="公厕">
+                <div class="restroom-info">
+                    <div class="restroom-title">长泰广场公共卫生间</div>
+                    <div class="restroom-distance">📍 距离 750 米</div>
+                    <div class="restroom-features">
+                        <span class="feature-tag-small">10:00-22:00</span>
+                        <span class="feature-tag-small">免费</span>
+                        <span class="feature-tag-small">清洁</span>
+                    </div>
+                </div>
+                <button class="restroom-nav-btn" onclick="navigate('长泰广场')">导航</button>
+            </div>
+
+            <div class="restroom-card">
+                <img src="卫生间.jpeg" class="restroom-image" alt="公厕">
+                <div class="restroom-info">
+                    <div class="restroom-title">中科路地铁站公厕</div>
+                    <div class="restroom-distance">📍 距离 1.2 公里</div>
+                    <div class="restroom-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">免费</span>
+                        <span class="feature-tag-small">无障碍</span>
+                    </div>
+                </div>
+                <button class="restroom-nav-btn" onclick="navigate('中科路地铁站')">导航</button>
+            </div>
+        </div>
+
+        <!-- Tab 2: 便利店 (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-content-area" style="display: none;">
+            <div class="store-card">
+                <img src="全家.jpg" class="store-image-small" alt="全家便利店">
+                <div class="store-info">
+                    <div class="store-title">全家便利店（盛荣路店）</div>
+                    <div class="store-distance">📍 距离 280 米</div>
+                    <div class="store-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">早餐优惠</span>
+                        <span class="feature-tag-small">可就餐</span>
+                    </div>
+                </div>
+                <button class="store-nav-btn" onclick="navigate('全家便利店盛荣路店')">导航</button>
+            </div>
+
+            <div class="store-card">
+                <img src="罗森.jpeg" class="store-image-small" alt="罗森便利店">
+                <div class="store-info">
+                    <div class="store-title">罗森便利店（张江店）</div>
+                    <div class="store-distance">📍 距离 350 米</div>
+                    <div class="store-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">现磨咖啡</span>
+                        <span class="feature-tag-small">熟食</span>
+                    </div>
+                </div>
+                <button class="store-nav-btn" onclick="navigate('罗森便利店张江店')">导航</button>
+            </div>
+
+            <div class="store-card">
+                <img src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=200&h=200" class="store-image-small" alt="7-11">
+                <div class="store-info">
+                    <div class="store-title">7-ELEVEn（张江高科站）</div>
+                    <div class="store-distance">📍 距离 320 米</div>
+                    <div class="store-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">ATM</span>
+                        <span class="feature-tag-small">快递代收</span>
+                    </div>
+                </div>
+                <button class="store-nav-btn" onclick="navigate('7-11张江高科站')">导航</button>
+            </div>
+
+            <div class="store-card">
+                <img src="https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=200&h=200" class="store-image-small" alt="喜士多">
+                <div class="store-info">
+                    <div class="store-title">喜士多便利店</div>
+                    <div class="store-distance">📍 距离 480 米</div>
+                    <div class="store-features">
+                        <span class="feature-tag-small">6:30-23:00</span>
+                        <span class="feature-tag-small">生鲜</span>
+                        <span class="feature-tag-small">熟食</span>
+                    </div>
+                </div>
+                <button class="store-nav-btn" onclick="navigate('喜士多便利店')">导航</button>
+            </div>
+
+            <div class="store-card">
+                <img src="https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=200&h=200" class="store-image-small" alt="便利蜂">
+                <div class="store-info">
+                    <div class="store-title">便利蜂（长泰广场店）</div>
+                    <div class="store-distance">📍 距离 750 米</div>
+                    <div class="store-features">
+                        <span class="feature-tag-small">24小时</span>
+                        <span class="feature-tag-small">自助结账</span>
+                        <span class="feature-tag-small">热餐</span>
+                    </div>
+                </div>
+                <button class="store-nav-btn" onclick="navigate('便利蜂长泰广场店')">导航</button>
+            </div>
+        </div>
+
+        <!-- Tab 3: 失物招领 (已隐藏) -->
+        <div class="tab-content-area" style="display: none;">
+            <div class="lost-found-card" onclick="viewLostFound('苹果手机')">
+                <img src="14.jpeg" class="lost-found-image" alt="苹果手机">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>苹果iPhone 14 Pro</span>
+                            <span class="lost-found-badge found">已找到</span>
+                        </div>
+                        <div class="lost-found-description">深空黑色，手机壳为透明硅胶材质，屏幕左上角有轻微划痕，内有家人照片。今日下午在浦东14路公交车后排座位发现。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 浦东14路公交</div>
+                        <div class="lost-found-meta-item">🕐 今天 14:30</div>
+                        <div class="lost-found-meta-item">👤 张师傅</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">2小时前</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lost-found-card" onclick="viewLostFound('蓝色背包')">
+                <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=240&h=240&fit=crop" class="lost-found-image" alt="蓝色背包" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect fill=%27%232196f3%27 width=%27240%27 height=%27240%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 font-size=%2760%27 fill=%27white%27 text-anchor=%27middle%27 dy=%27.3em%27%3E🎒%3C/text%3E%3C/svg%3E'">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>蓝色双肩背包</span>
+                            <span class="lost-found-badge found">已找到</span>
+                        </div>
+                        <div class="lost-found-description">耐克品牌蓝色运动背包，包内有笔记本电脑、充电器和教材，挂有"浦东新区图书馆"徽章。在张江高科站下车时遗落。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 张江高科站</div>
+                        <div class="lost-found-meta-item">🕐 今天 09:15</div>
+                        <div class="lost-found-meta-item">👤 李女士</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">7小时前</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lost-found-card" onclick="viewLostFound('儿童水杯')">
+                <img src="https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=240&h=240&fit=crop" class="lost-found-image" alt="儿童水杯" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect fill=%27%23ff4081%27 width=%27240%27 height=%27240%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 font-size=%2760%27 fill=%27white%27 text-anchor=%27middle%27 dy=%27.3em%27%3E🍼%3C/text%3E%3C/svg%3E'">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>粉色儿童保温杯</span>
+                            <span class="lost-found-badge found">已找到</span>
+                        </div>
+                        <div class="lost-found-description">迪士尼图案粉色保温杯，杯身贴有"王小美"姓名贴纸，容量约350ml，杯盖为吸管式设计。可能是小朋友遗落在车上。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 盛荣路站</div>
+                        <div class="lost-found-meta-item">🕐 昨天 16:45</div>
+                        <div class="lost-found-meta-item">👤 王师傅</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">昨天</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lost-found-card" onclick="viewLostFound('黑色钱包')">
+                <img src="https://images.unsplash.com/photo-1627123424574-724758594e93?w=240&h=240&fit=crop" class="lost-found-image" alt="黑色钱包" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect fill=%27%23000000%27 width=%27240%27 height=%27240%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 font-size=%2760%27 fill=%27white%27 text-anchor=%27middle%27 dy=%27.3em%27%3E👛%3C/text%3E%3C/svg%3E'">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>黑色皮质钱包</span>
+                            <span class="lost-found-badge lost">寻找失主</span>
+                        </div>
+                        <div class="lost-found-description">LV品牌黑色长款钱包，内有身份证、银行卡若干张及现金。发现于车厢中部座位下方，已交由公交公司失物招领处保管。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 金桥站</div>
+                        <div class="lost-found-meta-item">🕐 12-14 08:20</div>
+                        <div class="lost-found-meta-item">👤 陈师傅</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">2天前</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lost-found-card" onclick="viewLostFound('雨伞')">
+                <img src="https://images.unsplash.com/photo-1585314062604-1a357de8b000?w=240&h=240&fit=crop" class="lost-found-image" alt="黑色雨伞" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect fill=%27%2337474f%27 width=%27240%27 height=%27240%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 font-size=%2760%27 fill=%27white%27 text-anchor=%27middle%27 dy=%27.3em%27%3E☂️%3C/text%3E%3C/svg%3E'">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>黑色商务长柄伞</span>
+                            <span class="lost-found-badge found">已找到</span>
+                        </div>
+                        <div class="lost-found-description">黑色直杆长柄雨伞，伞柄为木质材质，伞布为防紫外线材料。伞柄底部有轻微磨损痕迹，在下雨天遗落于车内。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 张江高科站</div>
+                        <div class="lost-found-meta-item">🕐 12-13 18:00</div>
+                        <div class="lost-found-meta-item">👤 刘师傅</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">3天前</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lost-found-card" onclick="viewLostFound('图书')">
+                <img src="https://images.unsplash.com/photo-1512820790803-83ca734da794?w=240&h=240&fit=crop" class="lost-found-image" alt="图书" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27240%27 height=%27240%27%3E%3Crect fill=%27%238d6e63%27 width=%27240%27 height=%27240%27/%3E%3Ctext x=%2750%25%27 y=%2750%25%27 font-size=%2760%27 fill=%27white%27 text-anchor=%27middle%27 dy=%27.3em%27%3E📚%3C/text%3E%3C/svg%3E'">
+                <div class="lost-found-content">
+                    <div class="lost-found-header">
+                        <div class="lost-found-title">
+                            <span>Python编程教材</span>
+                            <span class="lost-found-badge found">已找到</span>
+                        </div>
+                        <div class="lost-found-description">《Python编程从入门到实践》第二版，封面有轻微折痕，书内有多处笔记和标注，夹有张江图书馆借书卡。</div>
+                    </div>
+                    <div class="lost-found-meta">
+                        <div class="lost-found-meta-item">📍 盛荣路站</div>
+                        <div class="lost-found-meta-item">🕐 12-12 10:30</div>
+                        <div class="lost-found-meta-item">👤 赵师傅</div>
+                    </div>
+                    <div class="lost-found-footer">
+                        <div class="lost-found-contact" onclick="callDriver(event)">📞 联系司机认领</div>
+                        <div class="lost-found-time">4天前</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 4: 美食 (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-content-area" style="display: none;">
+            <div class="food-card" onclick="viewFood('鼎泰丰')">
+                <img src="https://images.unsplash.com/photo-1563245372-f21724e3856d?w=800&h=400&fit=crop" class="food-image" alt="鼎泰丰">
+                <div class="food-info">
+                    <div class="food-name">鼎泰丰（长泰广场店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.7</div>
+                        <div class="food-distance">📍 750m</div>
+                        <div class="food-price">¥85/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">小笼包</span>
+                        <span class="food-tag">台湾菜</span>
+                        <span class="food-tag">排队</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('鼎泰丰（长泰广场店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('海底捞')">
+                <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=400&fit=crop" class="food-image" alt="海底捞">
+                <div class="food-info">
+                    <div class="food-name">海底捞火锅（张江店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.8</div>
+                        <div class="food-distance">📍 600m</div>
+                        <div class="food-price">¥120/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">火锅</span>
+                        <span class="food-tag">服务好</span>
+                        <span class="food-tag">等位</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('海底捞火锅（张江店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('外婆家')">
+                <img src="https://images.unsplash.com/photo-1555126634-323283e090fa?w=800&h=400&fit=crop" class="food-image" alt="外婆家">
+                <div class="food-info">
+                    <div class="food-name">外婆家（张江店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.5</div>
+                        <div class="food-distance">📍 900m</div>
+                        <div class="food-price">¥75/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">杭帮菜</span>
+                        <span class="food-tag">家常菜</span>
+                        <span class="food-tag">性价比高</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('外婆家（张江店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('吉祥馄饨')">
+                <img src="https://images.unsplash.com/photo-1612927601601-6638404737ce?w=800&h=400&fit=crop" class="food-image" alt="吉祥馄饨">
+                <div class="food-info">
+                    <div class="food-name">吉祥馄饨（盛荣路店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.3</div>
+                        <div class="food-distance">📍 300m</div>
+                        <div class="food-price">¥25/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">馄饨</span>
+                        <span class="food-tag">快餐</span>
+                        <span class="food-tag">实惠</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('吉祥馄饨（盛荣路店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('老乡鸡')">
+                <img src="https://images.unsplash.com/photo-1603073313407-f8a8e475a0b6?w=800&h=400&fit=crop" class="food-image" alt="老乡鸡">
+                <div class="food-info">
+                    <div class="food-name">老乡鸡（张江高科店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.4</div>
+                        <div class="food-distance">📍 400m</div>
+                        <div class="food-price">¥35/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">中式快餐</span>
+                        <span class="food-tag">干净卫生</span>
+                        <span class="food-tag">快捷</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('老乡鸡（张江高科店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('和府捞面')">
+                <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=400&fit=crop" class="food-image" alt="和府捞面">
+                <div class="food-info">
+                    <div class="food-name">和府捞面（张江店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.6</div>
+                        <div class="food-distance">📍 550m</div>
+                        <div class="food-price">¥45/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">面食</span>
+                        <span class="food-tag">书房式就餐</span>
+                        <span class="food-tag">环境好</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('和府捞面（张江店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('麦当劳')">
+                <img src="https://images.unsplash.com/photo-1619454016518-697bc231e7cb?w=800&h=400&fit=crop" class="food-image" alt="麦当劳">
+                <div class="food-info">
+                    <div class="food-name">麦当劳（张江店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.2</div>
+                        <div class="food-distance">📍 520m</div>
+                        <div class="food-price">¥35/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">快餐</span>
+                        <span class="food-tag">汉堡</span>
+                        <span class="food-tag">24小时</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('麦当劳（张江店）')">导航</button>
+            </div>
+
+            <div class="food-card" onclick="viewFood('星巴克')">
+                <img src="https://images.unsplash.com/photo-1511920170033-f8396924c348?w=800&h=400&fit=crop" class="food-image" alt="星巴克">
+                <div class="food-info">
+                    <div class="food-name">星巴克（长泰广场店）</div>
+                    <div class="food-meta">
+                        <div class="food-rating">⭐ 4.5</div>
+                        <div class="food-distance">📍 650m</div>
+                        <div class="food-price">¥40/人</div>
+                    </div>
+                    <div class="food-tags">
+                        <span class="food-tag">咖啡</span>
+                        <span class="food-tag">办公</span>
+                        <span class="food-tag">WIFI</span>
+                    </div>
+                </div>
+                <button class="food-nav-btn" onclick="event.stopPropagation(); navigate('星巴克（长泰广场店）')">导航</button>
+            </div>
+        </div>
+
+        <!-- Tab 5: 景点 (已隐藏，内容被上方新模块引用) -->
+        <div class="tab-content-area" style="display: none;">
+            <div class="scenic-card">
+                <div class="scenic-banner" style="background: linear-gradient(135deg, #e8f5e9 0%, #a5d6a7 100%); display: flex; align-items: center; justify-content: center; font-size: 80px;">🌳</div>
+                <div class="scenic-content">
+                    <div class="scenic-name">
+                        张江公园
+                        <span class="price-badge free">免费</span>
+                    </div>
+                    <div class="scenic-description">张江地区最大的综合性公园，绿树成荫，湖水清澈，适合散步休闲。</div>
+                    <div class="scenic-info">
+                        <div class="scenic-info-item">📍 1.2km</div>
+                        <div class="scenic-info-item">🕐 全天开放</div>
+                    </div>
+                    <div class="service-actions">
+                        <button class="action-button primary" onclick="navigate('张江公园')">导航</button>
+                        <button class="action-button secondary" onclick="viewDetail('张江公园')">详情</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="scenic-card">
+                <img src="https://images.unsplash.com/photo-1530521954074-e64f6810b32d?w=800&h=440&fit=crop" class="scenic-banner" alt="上海科技馆">
+                <div class="scenic-content">
+                    <div class="scenic-name">
+                        上海科技馆
+                        <span class="price-badge paid">¥45起</span>
+                    </div>
+                    <div class="scenic-description">国家5A级科普教育基地，拥有12个主题展区，适合亲子游览。</div>
+                    <div class="scenic-info">
+                        <div class="scenic-info-item">📍 3.5km</div>
+                        <div class="scenic-info-item">🕐 9:00-17:15</div>
+                    </div>
+                    <div class="service-actions">
+                        <button class="action-button primary" onclick="navigate('上海科技馆')">导航</button>
+                        <button class="action-button ctrip" onclick="buyOnCtrip('上海科技馆')">购票</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="scenic-card">
+                <img src="https://images.unsplash.com/photo-1585338447937-7082f8fc763d?w=800&h=440&fit=crop" class="scenic-banner" alt="世纪公园">
+                <div class="scenic-content">
+                    <div class="scenic-name">
+                        世纪公园
+                        <span class="price-badge paid">¥10</span>
+                    </div>
+                    <div class="scenic-description">上海市中心区域最大的自然生态公园，春季樱花盛开，秋季色彩斑斓。</div>
+                    <div class="scenic-info">
+                        <div class="scenic-info-item">📍 5.8km</div>
+                        <div class="scenic-info-item">🕐 7:00-18:00</div>
+                    </div>
+                    <div class="service-actions">
+                        <button class="action-button primary" onclick="navigate('世纪公园')">导航</button>
+                        <button class="action-button ctrip" onclick="buyOnCtrip('世纪公园')">购票</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="scenic-card">
+                <img src="https://images.unsplash.com/photo-1613490493576-7fde63acd811?w=800&h=440&fit=crop" class="scenic-banner" alt="上海迪士尼乐园">
+                <div class="scenic-content">
+                    <div class="scenic-name">
+                        上海迪士尼乐园
+                        <span class="price-badge paid">¥399起</span>
+                    </div>
+                    <div class="scenic-description">中国大陆首座迪士尼主题乐园，拥有六大主题园区，适合全家游玩。</div>
+                    <div class="scenic-info">
+                        <div class="scenic-info-item">📍 18km</div>
+                        <div class="scenic-info-item">🕐 9:00-21:00</div>
+                    </div>
+                    <div class="service-actions">
+                        <button class="action-button primary" onclick="navigate('上海迪士尼乐园')">导航</button>
+                        <button class="action-button ctrip" onclick="buyOnCtrip('上海迪士尼乐园')">购票</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 互动模块 ==================== -->
+    <div id="interactModule" class="main-module">
+        <!-- Tab切换 -->
+        <div class="interact-tabs">
+            <div class="interact-tab active" onclick="switchInteractTab(0)">逛逛</div>
+            <div class="interact-tab" onclick="switchInteractTab(1)">附近的人</div>
+        </div>
+
+        <!-- 逛逛内容（朋友圈风格） -->
+        <div class="interact-content active">
+            <div class="moments-container">
+            <!-- 朋友圈动态1 -->
+            <div class="moment-card active">
+                <div class="moment-header">
+                    <div class="moment-avatar">👨</div>
+                    <div class="moment-user-info">
+                        <div class="moment-username">张伟</div>
+                        <div class="moment-bus-info">🚌 浦东14路 · 盛荣路站</div>
+                    </div>
+                </div>
+                <div class="moment-content">今天天气真好，坐在公交车上看着窗外的风景，心情都变好了～</div>
+                <div class="moment-images">
+                    <img src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=300&h=300&fit=crop" class="moment-image" alt="风景">
+                </div>
+                <div class="moment-footer">
+                    <div class="moment-time">5分钟前</div>
+                    <div class="moment-actions">
+                        <div class="moment-action moment-like-btn" data-moment-id="1" onclick="toggleLike(this)">
+                            <span class="like-icon">👍</span>
+                            <span class="like-count">12</span>
+                        </div>
+                        <div class="moment-action moment-comment-btn" onclick="toggleCommentBox('moment1')">
+                            <span>💬</span>
+                            <span class="comment-count">3</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="comment-section" id="moment1-comments" style="display: none;">
+                    <div class="comment-input-wrapper">
+                        <input type="text" class="comment-input" placeholder="写下你的评论..." id="moment1-input">
+                        <button class="comment-submit-btn" onclick="submitComment('moment1')">发送</button>
+                    </div>
+                    <div class="comments-list">
+                        <div class="comment-item">
+                            <span class="comment-user">李明:</span>
+                            <span class="comment-text">风景真的很美！</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">王芳:</span>
+                            <span class="comment-text">下次一起去</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">陈浩:</span>
+                            <span class="comment-text">这个角度拍的真好</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 朋友圈动态2 -->
+            <div class="moment-card">
+                <div class="moment-header">
+                    <div class="moment-avatar" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">👩</div>
+                    <div class="moment-user-info">
+                        <div class="moment-username">李娜</div>
+                        <div class="moment-bus-info">🚌 浦东14路 · 张江高科站</div>
+                    </div>
+                </div>
+                <div class="moment-content">下午茶时间到！在公交上发现了一家新开的奶茶店，准备下车去尝试一下🍵</div>
+                <div class="moment-images">
+                    <img src="https://images.unsplash.com/photo-1556912173-3bb406ef7e77?w=300&h=300&fit=crop" class="moment-image" alt="奶茶">
+                    <img src="https://images.unsplash.com/photo-1506619216599-9d16d0903dfd?w=300&h=300&fit=crop" class="moment-image" alt="店铺">
+                </div>
+                <div class="moment-footer">
+                    <div class="moment-time">18分钟前</div>
+                    <div class="moment-actions">
+                        <div class="moment-action moment-like-btn" data-moment-id="2" onclick="toggleLike(this)">
+                            <span class="like-icon">👍</span>
+                            <span class="like-count">25</span>
+                        </div>
+                        <div class="moment-action moment-comment-btn" onclick="toggleCommentBox('moment2')">
+                            <span>💬</span>
+                            <span class="comment-count">8</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="comment-section" id="moment2-comments" style="display: none;">
+                    <div class="comment-input-wrapper">
+                        <input type="text" class="comment-input" placeholder="写下你的评论..." id="moment2-input">
+                        <button class="comment-submit-btn" onclick="submitComment('moment2')">发送</button>
+                    </div>
+                    <div class="comments-list">
+                        <div class="comment-item">
+                            <span class="comment-user">张强:</span>
+                            <span class="comment-text">哪家奶茶店？我也想去试试</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">刘洋:</span>
+                            <span class="comment-text">下午茶走起！</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 朋友圈动态3 -->
+            <div class="moment-card">
+                <div class="moment-header">
+                    <div class="moment-avatar" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">👦</div>
+                    <div class="moment-user-info">
+                        <div class="moment-username">王小明</div>
+                        <div class="moment-bus-info">🚌 浦东14路 · 张江高科站</div>
+                    </div>
+                </div>
+                <div class="moment-content">通勤路上遇到了好多有趣的事情，公交车上的生活真是精彩！</div>
+                <div class="moment-footer">
+                    <div class="moment-time">35分钟前</div>
+                    <div class="moment-actions">
+                        <div class="moment-action moment-like-btn" data-moment-id="3" onclick="toggleLike(this)">
+                            <span class="like-icon">👍</span>
+                            <span class="like-count">8</span>
+                        </div>
+                        <div class="moment-action moment-comment-btn" onclick="toggleCommentBox('moment3')">
+                            <span>💬</span>
+                            <span class="comment-count">2</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="comment-section" id="moment3-comments" style="display: none;">
+                    <div class="comment-input-wrapper">
+                        <input type="text" class="comment-input" placeholder="写下你的评论..." id="moment3-input">
+                        <button class="comment-submit-btn" onclick="submitComment('moment3')">发送</button>
+                    </div>
+                    <div class="comments-list">
+                        <div class="comment-item">
+                            <span class="comment-user">赵敏:</span>
+                            <span class="comment-text">每天都有新发现！</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">孙丽:</span>
+                            <span class="comment-text">公交生活真精彩</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 朋友圈动态4 -->
+            <div class="moment-card">
+                <div class="moment-header">
+                    <div class="moment-avatar" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">👧</div>
+                    <div class="moment-user-info">
+                        <div class="moment-username">赵敏</div>
+                        <div class="moment-bus-info">🚌 浦东14路 · 盛荣路站</div>
+                    </div>
+                </div>
+                <div class="moment-content">发现了一个超赞的路边小店，牛肉面超级好吃！推荐给大家～</div>
+                <div class="moment-images">
+                    <img src="https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=300&h=300&fit=crop" class="moment-image" alt="美食">
+                    <img src="https://images.unsplash.com/photo-1555126634-323283e090fa?w=300&h=300&fit=crop" class="moment-image" alt="餐厅">
+                    <img src="https://images.unsplash.com/photo-1563245372-f21724e3856d?w=300&h=300&fit=crop" class="moment-image" alt="菜品">
+                </div>
+                <div class="moment-footer">
+                    <div class="moment-time">1小时前</div>
+                    <div class="moment-actions">
+                        <div class="moment-action moment-like-btn" data-moment-id="4" onclick="toggleLike(this)">
+                            <span class="like-icon">👍</span>
+                            <span class="like-count">45</span>
+                        </div>
+                        <div class="moment-action moment-comment-btn" onclick="toggleCommentBox('moment4')">
+                            <span>💬</span>
+                            <span class="comment-count">15</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="comment-section" id="moment4-comments" style="display: none;">
+                    <div class="comment-input-wrapper">
+                        <input type="text" class="comment-input" placeholder="写下你的评论..." id="moment4-input">
+                        <button class="comment-submit-btn" onclick="submitComment('moment4')">发送</button>
+                    </div>
+                    <div class="comments-list">
+                        <div class="comment-item">
+                            <span class="comment-user">李涛:</span>
+                            <span class="comment-text">看起来超好吃的！</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">王莉:</span>
+                            <span class="comment-text">在哪里？我也要去</span>
+                        </div>
+                        <div class="comment-item">
+                            <span class="comment-user">刘军:</span>
+                            <span class="comment-text">下次带我一起</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="moments-nav-buttons">
+                <button class="moment-nav-btn" id="momentPrevBtn" onclick="switchMomentCard(-1)">← 上一个</button>
+                <button class="moment-nav-btn" id="momentNextBtn" onclick="switchMomentCard(1)">下一个 →</button>
+            </div>
+        </div>
+
+        <!-- 附近的人内容 -->
+        <div class="interact-content">
+            <div class="nearby-cards-container">
+            <!-- 附近的人1 -->
+            <div class="nearby-person-card active">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">👨</div>
+                    <div class="nearby-name">刘强</div>
+                    <div class="nearby-age-gender">25岁 · ♂</div>
+                </div>
+                <div class="nearby-signature">热爱生活，喜欢旅行和摄影，寻找有趣的灵魂一起探索世界</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">🎵 音乐</span>
+                    <span class="nearby-tag">📷 摄影</span>
+                    <span class="nearby-tag">✈️ 旅行</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 50m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('刘强', '👨')">单聊</button>
+                </div>
+            </div>
+
+            <!-- 附近的人2 -->
+            <div class="nearby-person-card">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%);">👩</div>
+                    <div class="nearby-name">陈婷婷</div>
+                    <div class="nearby-age-gender">23岁 · ♀</div>
+                </div>
+                <div class="nearby-signature">温柔善良的小仙女，喜欢美食和烘焙，期待遇见美好</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">🍰 烘焙</span>
+                    <span class="nearby-tag">🍜 美食</span>
+                    <span class="nearby-tag">📚 阅读</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 120m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('陈婷婷', '👩')">单聊</button>
+                </div>
+            </div>
+
+            <!-- 附近的人3 -->
+            <div class="nearby-person-card">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">👦</div>
+                    <div class="nearby-name">孙浩</div>
+                    <div class="nearby-age-gender">27岁 · ♂</div>
+                </div>
+                <div class="nearby-signature">健身达人，喜欢运动和挑战自我，希望遇到志同道合的朋友</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">💪 健身</span>
+                    <span class="nearby-tag">⚽ 足球</span>
+                    <span class="nearby-tag">🏃 跑步</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 80m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('孙浩', '👦')">单聊</button>
+                </div>
+            </div>
+
+            <!-- 附近的人4 -->
+            <div class="nearby-person-card">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">👧</div>
+                    <div class="nearby-name">周芳</div>
+                    <div class="nearby-age-gender">24岁 · ♀</div>
+                </div>
+                <div class="nearby-signature">爱笑的女孩，喜欢猫咪和手作，相信生活中充满小确幸</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">🐱 猫咪</span>
+                    <span class="nearby-tag">✂️ 手工</span>
+                    <span class="nearby-tag">🎨 绘画</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 200m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('周芳', '👧')">单聊</button>
+                </div>
+            </div>
+
+            <!-- 附近的人5 -->
+            <div class="nearby-person-card">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);">👨</div>
+                    <div class="nearby-name">吴磊</div>
+                    <div class="nearby-age-gender">26岁 · ♂</div>
+                </div>
+                <div class="nearby-signature">程序员，热爱科技和编程，也喜欢电影和游戏</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">💻 编程</span>
+                    <span class="nearby-tag">🎮 游戏</span>
+                    <span class="nearby-tag">🎬 电影</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 150m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('吴磊', '👨')">单聊</button>
+                </div>
+            </div>
+
+            <!-- 附近的人6 -->
+            <div class="nearby-person-card">
+                <div class="nearby-card-header">
+                    <div class="nearby-avatar" style="background: linear-gradient(135deg, #fdcbf1 0%, #e6dee9 100%);">👩</div>
+                    <div class="nearby-name">郑雨晴</div>
+                    <div class="nearby-age-gender">22岁 · ♀</div>
+                </div>
+                <div class="nearby-signature">设计师，喜欢一切美的事物，追求精致生活</div>
+                <div class="nearby-tags">
+                    <span class="nearby-tag">🎨 设计</span>
+                    <span class="nearby-tag">☕ 咖啡</span>
+                    <span class="nearby-tag">🌸 插花</span>
+                </div>
+                <div class="nearby-footer">
+                    <div class="nearby-distance">📍 距离 95m</div>
+                    <button class="nearby-chat-btn" onclick="event.stopPropagation(); openChat('郑雨晴', '👩')">单聊</button>
+                </div>
+            </div>
+            </div>
+
+            <!-- 导航按钮 -->
+            <div class="nearby-nav-buttons">
+                <button class="nearby-nav-btn" id="nearbyPrevBtn" onclick="switchNearbyCard(-1)">← 上一个</button>
+                <button class="nearby-nav-btn" id="nearbyNextBtn" onclick="switchNearbyCard(1)">下一个 →</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 单聊模态框 ==================== -->
+    <div id="chatModal" class="chat-modal">
+        <div class="chat-header">
+            <button class="chat-back-btn" onclick="closeChat()">←</button>
+            <div class="chat-user-name" id="chatUserName">用户</div>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <!-- 消息将动态添加到这里 -->
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput" placeholder="输入消息...">
+            <button class="chat-send-btn" onclick="sendMessage()">发送</button>
+        </div>
+    </div>
+
+    <!-- ==================== 我的模块 ==================== -->
+    <div id="profileModule" class="main-module">
+        <!-- 个人信息头部 -->
+        <div class="profile-header">
+            <div class="profile-avatar-wrapper" onclick="changeAvatar()">
+                <div class="profile-avatar">👤</div>
+                <div class="avatar-edit-badge">📷</div>
+            </div>
+            <div class="profile-info">
+                <div class="profile-name-row">
+                    <div class="profile-name">优雅的冒险家</div>
+                    <div class="edit-profile-btn" onclick="editProfile()">编辑</div>
+                </div>
+                <div class="profile-id">ID: 52036627</div>
+                <div class="profile-level">
+                    <div class="level-badge">LV.5</div>
+                    <div class="level-points">积分: 1280</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div class="profile-stats">
+            <div class="stat-item" onclick="showToast('查看我的发布')">
+                <div class="stat-number">12</div>
+                <div class="stat-label">发布</div>
+            </div>
+            <div class="stat-item" onclick="showToast('查看获赞列表')">
+                <div class="stat-number">86</div>
+                <div class="stat-label">获赞</div>
+            </div>
+            <div class="stat-item" onclick="showToast('查看我的收藏')">
+                <div class="stat-number">23</div>
+                <div class="stat-label">收藏</div>
+            </div>
+            <div class="stat-item" onclick="showToast('查看关注列表')">
+                <div class="stat-number">45</div>
+                <div class="stat-label">关注</div>
+            </div>
+        </div>
+
+        <!-- 快捷功能 -->
+        <div class="quick-actions">
+            <div class="quick-actions-grid">
+                <div class="quick-action-item" onclick="showToast('我的订单')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">📦</div>
+                    <div class="quick-action-label">我的订单</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('优惠券')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">🎫</div>
+                    <div class="quick-action-label">优惠券</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('乘车记录')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">🚌</div>
+                    <div class="quick-action-label">乘车记录</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('收藏线路')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">⭐</div>
+                    <div class="quick-action-label">收藏线路</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('乘车码')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">📱</div>
+                    <div class="quick-action-label">乘车码</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('常用地点')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">📍</div>
+                    <div class="quick-action-label">常用地点</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('每日签到')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">✓</div>
+                    <div class="quick-action-label">每日签到</div>
+                </div>
+                <div class="quick-action-item" onclick="showToast('邀请好友')">
+                    <div class="quick-action-icon" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">👥</div>
+                    <div class="quick-action-label">邀请好友</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 个人中心菜单 -->
+        <div class="menu-section">
+            <div class="menu-section-title">个人中心</div>
+            <div class="profile-menu">
+                <div class="menu-item" onclick="showToast('我的发布')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">📝</div>
+                    <div class="menu-text">我的发布</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('我的收藏')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">⭐</div>
+                    <div class="menu-text">我的收藏</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('浏览历史')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">🕐</div>
+                    <div class="menu-text">浏览历史</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('出行记录')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">🗺️</div>
+                    <div class="menu-text">出行记录</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 服务功能菜单 -->
+        <div class="menu-section">
+            <div class="menu-section-title">服务功能</div>
+            <div class="profile-menu">
+                <div class="menu-item" onclick="showToast('消息通知')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);">🔔</div>
+                    <div class="menu-text">消息通知</div>
+                    <div class="menu-badge">3</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('会员中心')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);">👑</div>
+                    <div class="menu-text">会员中心</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('钱包')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);">💰</div>
+                    <div class="menu-text">我的钱包</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统设置菜单 -->
+        <div class="menu-section">
+            <div class="menu-section-title">系统设置</div>
+            <div class="profile-menu">
+                <div class="menu-item" onclick="showToast('设置')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);">⚙️</div>
+                    <div class="menu-text">设置</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('帮助与反馈')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);">💬</div>
+                    <div class="menu-text">帮助与反馈</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+                <div class="menu-item" onclick="showToast('关于我们')">
+                    <div class="menu-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">ℹ️</div>
+                    <div class="menu-text">关于我们</div>
+                    <div class="menu-arrow">›</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 退出登录 -->
+        <div class="menu-section">
+            <div class="profile-menu">
+                <div class="menu-item" onclick="logout()" style="justify-content: center;">
+                    <div class="menu-text" style="color: #ff4d4f; text-align: center;">退出登录</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-safe-area"></div>
+    </div>
+
+    <!-- ==================== 底部导航栏 ==================== -->
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="switchMainModule(0)">
+            <div class="nav-icon"><img src="首页.png" alt="首页"></div>
+            <div class="nav-label">首页</div>
+        </div>
+        <div class="nav-item" onclick="switchMainModule(1)">
+            <div class="nav-icon"><img src="实时公交.png" alt="实时公交"></div>
+            <div class="nav-label">实时公交</div>
+        </div>
+        <div class="nav-item" onclick="switchMainModule(2)">
+            <div class="nav-icon"><img src="圈子.png" alt="圈子"></div>
+            <div class="nav-label">圈子</div>
+        </div>
+        <div class="nav-item" onclick="switchMainModule(3)">
+            <div class="nav-icon"><img src="我的.png" alt="我的"></div>
+            <div class="nav-label">我的</div>
+        </div>
+    </div>
+
+    <div class="bottom-safe-area"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
